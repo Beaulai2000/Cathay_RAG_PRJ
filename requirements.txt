@@ -1,0 +1,6 @@
+pyreadstat
+pandas
+langchain
+langchain-openai
+langchain-chroma
+chromadb

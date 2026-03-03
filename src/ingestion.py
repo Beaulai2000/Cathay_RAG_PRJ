@@ -32,8 +32,8 @@ def read_policy_text(path: Path | None = None) -> str:
 
 def naive_paragraph_chunk(
     text: str,
-    chunk_size: int = 400,
-    overlap: int = 80,
+    chunk_size: int = 400, #try 300 -500
+    overlap: int = 75, # try 50 - 100
 ) -> List[str]:
     """Very simple paragraph‑aware chunking.
 

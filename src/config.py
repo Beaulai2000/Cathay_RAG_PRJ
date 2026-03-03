@@ -1,10 +1,9 @@
 """Configuration for the Cathay travel insurance RAG prototype.
 
 Notes:
-- API keys (e.g., OpenAI) should be provided via environment variables and
-  **never** hard‑coded in this file.
 - This module centralizes model names and index paths so they can be
   changed in one place.
+- Change gpt model and embedding model later for better performance
 """
 
 import os

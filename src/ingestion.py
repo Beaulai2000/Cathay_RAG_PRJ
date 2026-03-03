@@ -13,9 +13,12 @@ leave semantic/recursive chunking as future work.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import List
 
-from config import DEFAULT_POLICY_CLEAN_PATH
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
+from config import DEFAULT_POLICY_CLEAN_PATH, EMBEDDING_MODEL, INDEX_DIR
 
 
 def read_policy_text(path: Path | None = None) -> str:
@@ -66,19 +69,55 @@ def naive_paragraph_chunk(
     return chunks
 
 
-def build_index():
-    """Placeholder for index‑building logic.
+def build_index() -> None:
+    """Build (or rebuild) the semantic index for the policy text.
 
-    When you are ready to ingest the actual policy, this function should:
+    Steps:
+    1. Load cleaned policy text from DEFAULT_POLICY_CLEAN_PATH.
+    2. Chunk it with naive_paragraph_chunk.
+    3. Create a Chroma vector store with OpenAI embeddings and persist
+       it under INDEX_DIR.
 
-    1. Call `read_policy_text()` to load the cleaned policy.
-    2. Use `naive_paragraph_chunk()` (or a more advanced splitter) to
-       split the text into chunks.
-    3. Embed each chunk and store them in a vector store (e.g., Chroma),
-       together with metadata such as article/section IDs.
-
-    For the coding assignment you can implement this step once you have
-    your policy document ready.
+    This is a simple baseline: one document chunk = one Chroma document,
+    with metadata including a sequential chunk_id.
     """
 
-    raise NotImplementedError("build_index() is a placeholder for now.")
+    print(f"[INFO] Reading cleaned policy from {DEFAULT_POLICY_CLEAN_PATH}")
+    text = read_policy_text()
+    chunks = naive_paragraph_chunk(text)
+    print(f"[INFO] Split policy into {len(chunks)} chunks")
+
+    # Prepare documents and metadata
+    from langchain_core.documents import Document
+
+    docs = []
+    for i, chunk in enumerate(chunks):
+        metadata = {"chunk_id": i}
+        docs.append(Document(page_content=chunk, metadata=metadata))
+
+    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    INDEX_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"[INFO] Building Chroma index in {INDEX_DIR}")
+    # Rebuild the collection from scratch each time for now.
+    vectordb = Chroma(
+        collection_name="travel_policy",
+        embedding_function=embeddings,
+        persist_directory=str(INDEX_DIR),
+    )
+    # Wipe existing collection contents (if any)
+    vectordb.delete_collection()
+
+    # Create a fresh store with the new docs
+    vectordb = Chroma.from_documents(
+        documents=docs,
+        embedding=embeddings,
+        collection_name="travel_policy",
+        persist_directory=str(INDEX_DIR),
+    )
+    vectordb.persist()
+    print("[INFO] Index build complete.")
+
+
+if __name__ == "__main__":
+    build_index()

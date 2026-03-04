@@ -44,18 +44,20 @@ class RAGPipeline:
 
         context = "\n".join(context_lines)
 
-        # 3. Compose prompt
-        prompt = f"""
-你是一位保險專員，負責解釋「旅遊不便險」的條款內容。
-你只能根據下列條款內容回答問題，不要加入條款以外的推測。
-若條款未明確規範，請說明「條款未明確規範，建議洽詢客服或查看正式保單」。
+        # 3. Compose chat-style messages
+        messages = [
+            (
+                "system",
+                (
+                    "你是一位保險專員，負責解釋「旅遊不便險」的條款內容。"
+                    "你只能根據提供的條款內容回答問題，不要加入條款以外的推測。"
+                    "若條款未明確規範，請說明"
+                    "「條款未明確規範，建議洽詢客服或查看正式保單」。"
+                    "請用條理清楚的中文回答，並在最後列出你引用的條款編號與關鍵原文。"
+                ),
+            ),
+            ("user", f"{context}\n\n問題：{question}"),
+        ]
 
-請用條理清楚的中文回答，並在最後列出你引用的條款編號與關鍵原文。
-
-{context}
-
-問題：{question}
-""".strip()
-
-        resp = self.llm.invoke(prompt)
+        resp = self.llm.invoke(messages)
         return resp.content

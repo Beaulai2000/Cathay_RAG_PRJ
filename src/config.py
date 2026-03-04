@@ -26,6 +26,27 @@ RETRIEVER_TOP_K = int(os.environ.get("CATHAY_RAG_RETRIEVER_TOP_K", "5"))
 # Number of previous conversation turns to include in the chat prompt.
 CHAT_HISTORY_WINDOW = int(os.environ.get("CATHAY_RAG_CHAT_HISTORY_WINDOW", "3"))
 
+# Supported policy sections for section-aware retrieval.
+INSURANCE_SECTIONS = (
+    "旅程取消保險",
+    "班機延誤保險",
+    "旅程更改保險",
+    "行李延誤保險",
+    "行李損失保險",
+    "旅行文件損失保險",
+    "個人海外旅行補償保險",
+    "劫機保險",
+    "食品中毒保險",
+    "現金竊盜保險",
+    "信用卡盜用保險",
+    "居家竊盜保險",
+    "租車事故保險",
+    "特殊活動取消慰問保險",
+    "賽事取消慰問保險",
+    "行動電話被竊損失保險",
+    "海外旅行急難救助保險",
+)
+
 
 # === Chunking ===
 

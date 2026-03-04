@@ -13,10 +13,10 @@ from __future__ import annotations
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-from config import EMBEDDING_MODEL, INDEX_DIR, RETRIEVER_TOP_K
+from ..config import EMBEDDING_MODEL, INDEX_DIR, RETRIEVER_TOP_K
 
 
-def get_semantic_retriever(k: int | None = None):
+def get_semantic_retriever(k: int | None = None, section: str | None = None):
     """Return a LangChain retriever over the policy index.
 
     Assumes that the index has been built and persisted under `INDEX_DIR`.
@@ -30,4 +30,8 @@ def get_semantic_retriever(k: int | None = None):
         persist_directory=str(INDEX_DIR),
     )
 
-    return vectordb.as_retriever(search_kwargs={"k": k})
+    search_kwargs = {"k": k}
+    if section:
+        search_kwargs["filter"] = {"section": section}
+
+    return vectordb.as_retriever(search_kwargs=search_kwargs)

@@ -11,31 +11,33 @@ The goal is to keep the core flow simple:
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import Any, List, Sequence
 
 from langchain_openai import ChatOpenAI
 
-from config import CHAT_HISTORY_WINDOW, LLM_MODEL, RETRIEVER_TOP_K
-from retrievers.semantic import get_semantic_retriever
+from .config import CHAT_HISTORY_WINDOW, INSURANCE_SECTIONS, LLM_MODEL, RETRIEVER_TOP_K
+from .retrievers.semantic import get_semantic_retriever
 
 
 class RAGPipeline:
     """Simple RAG pipeline for the travel insurance policy."""
 
     def __init__(self, k: int | None = None) -> None:
-        k = k or RETRIEVER_TOP_K
-        self.retriever = get_semantic_retriever(k=k)
+        self.k = k or RETRIEVER_TOP_K
+        self.retriever = get_semantic_retriever(k=self.k)
         self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
 
     def answer(
         self,
         question: str,
-        history: Sequence[tuple[str, str]] | None = None,
+        history: Sequence[Any] | None = None,
     ) -> str:
         """Retrieve relevant clauses and generate an answer with citations."""
 
         # 1. Retrieve top‑k chunks
-        docs = self.retriever.get_relevant_documents(question)
+        section = infer_requested_section(question)
+        retriever = get_semantic_retriever(k=self.k, section=section) if section else self.retriever
+        docs = retriever.invoke(question)
 
         if not docs:
             return "目前找不到與條款內容相符的資訊，建議洽詢客服或查看正式保單。"
@@ -63,13 +65,36 @@ class RAGPipeline:
         ]
 
         recent_history = list(history or [])[-CHAT_HISTORY_WINDOW:]
-        for user_message, assistant_message in recent_history:
-            if user_message:
-                messages.append(("user", user_message))
-            if assistant_message:
-                messages.append(("assistant", assistant_message))
+        for item in recent_history:
+            if isinstance(item, dict):
+                role = item.get("role")
+                content = item.get("content")
+                if role in {"user", "assistant"} and isinstance(content, str) and content:
+                    messages.append((role, content))
+                continue
+
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                user_message, assistant_message = item[0], item[1]
+                if user_message:
+                    messages.append(("user", user_message))
+                if assistant_message:
+                    messages.append(("assistant", assistant_message))
 
         messages.append(("user", f"{context}\n\n問題：{question}"))
 
         resp = self.llm.invoke(messages)
         return resp.content
+
+
+def infer_requested_section(question: str) -> str | None:
+    """Infer whether the user explicitly mentioned a supported insurance section."""
+
+    for section in INSURANCE_SECTIONS:
+        aliases = {section}
+        if section.endswith("保險"):
+            aliases.add(section.removesuffix("保險"))
+
+        if any(alias and alias in question for alias in aliases):
+            return section
+
+    return None

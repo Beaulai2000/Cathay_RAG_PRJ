@@ -19,7 +19,14 @@ from typing import List
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-from config import CHUNK_OVERLAP, CHUNK_SIZE, DEFAULT_POLICY_CLEAN_PATH, EMBEDDING_MODEL, INDEX_DIR
+from .config import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    DEFAULT_POLICY_CLEAN_PATH,
+    EMBEDDING_MODEL,
+    INDEX_DIR,
+    INSURANCE_SECTIONS,
+)
 
 
 def read_policy_text(path: Path | None = None) -> str:
@@ -139,6 +146,15 @@ def extract_article_id(chunk: str) -> str:
     return first_line if ARTICLE_HEADING_RE.match(first_line) else "(未標註條款編號)"
 
 
+def infer_section(text: str) -> str:
+    """Infer the policy section from known insurance section names."""
+
+    for section in INSURANCE_SECTIONS:
+        if section in text:
+            return section
+    return "未分類"
+
+
 def preview_chunks(chunks: List[str], limit: int = 3, preview_len: int = 160) -> None:
     """Print a short preview of the first few chunks for quick manual inspection."""
 
@@ -180,6 +196,7 @@ def build_index() -> None:
             "chunk_id": i,
             # Store the article heading so downstream answers can cite the clause.
             "article_id": extract_article_id(chunk),
+            "section": infer_section(chunk),
         }
         docs.append(Document(page_content=chunk, metadata=metadata))
 

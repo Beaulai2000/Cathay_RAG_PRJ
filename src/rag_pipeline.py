@@ -22,10 +22,16 @@ from .retrievers.semantic import get_semantic_retriever
 class RAGPipeline:
     """Simple RAG pipeline for the travel insurance policy."""
 
-    def __init__(self, k: int | None = None) -> None:
+    def __init__(
+        self,
+        k: int | None = None,
+        llm_model: str | None = None,
+        embedding_model: str | None = None,
+    ) -> None:
         self.k = k or RETRIEVER_TOP_K
-        self.retriever = get_semantic_retriever(k=self.k)
-        self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
+        self.embedding_model = embedding_model
+        self.retriever = get_semantic_retriever(k=self.k, embedding_model=embedding_model)
+        self.llm = ChatOpenAI(model=llm_model or LLM_MODEL, temperature=0)
 
     def answer(
         self,
@@ -44,7 +50,11 @@ class RAGPipeline:
         if not section and is_ambiguous_section_question(question):
             return build_section_clarification_message()
 
-        retriever = get_semantic_retriever(k=self.k, section=section) if section else self.retriever
+        retriever = (
+            get_semantic_retriever(k=self.k, section=section, embedding_model=self.embedding_model)
+            if section
+            else self.retriever
+        )
         docs = retriever.invoke(question)
 
         if not docs:

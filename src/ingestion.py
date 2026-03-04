@@ -171,6 +171,7 @@ def build_index(
     chunk_size: int | None = None,
     overlap: int | None = None,
     preview_limit: int = 3,
+    embedding_model: str | None = None,
 ) -> None:
     """Build (or rebuild) the semantic index for the policy text.
 
@@ -186,6 +187,7 @@ def build_index(
 
     chunk_size = chunk_size or CHUNK_SIZE
     overlap = overlap or CHUNK_OVERLAP
+    embedding_model = embedding_model or EMBEDDING_MODEL
 
     print(f"[INFO] Reading cleaned policy from {DEFAULT_POLICY_CLEAN_PATH}")
     text = read_policy_text()
@@ -208,7 +210,7 @@ def build_index(
         }
         docs.append(Document(page_content=chunk, metadata=metadata))
 
-    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    embeddings = OpenAIEmbeddings(model=embedding_model)
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] Building Chroma index in {INDEX_DIR}")

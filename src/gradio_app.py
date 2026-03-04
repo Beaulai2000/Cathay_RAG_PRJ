@@ -21,7 +21,7 @@ from rag_pipeline import RAGPipeline
 
 
 def build_pipeline() -> RAGPipeline:
-    # You can tweak k here if needed
+    # Change k here if needed
     return RAGPipeline(k=5)
 
 
@@ -31,14 +31,14 @@ PIPELINE = build_pipeline()
 def chat_fn(message: str, history: list[tuple[str, str]]) -> str:
     """Gradio chat handler.
 
-    We ignore the history for now and treat each question independently.
-    Later you can extend RAGPipeline to use multi‑turn context if desired.
+    Pass recent chat history into the pipeline so the model can answer
+    follow-up questions with conversational context.
     """
 
     if not message.strip():
         return "請輸入問題，例如：什麼情況下可以申請旅遊延誤賠償？"
 
-    answer = PIPELINE.answer(message)
+    answer = PIPELINE.answer(message, history=history)
     return answer
 
 

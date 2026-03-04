@@ -11,11 +11,11 @@ The goal is to keep the core flow simple:
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Sequence
 
 from langchain_openai import ChatOpenAI
 
-from config import LLM_MODEL, RETRIEVER_TOP_K
+from config import CHAT_HISTORY_WINDOW, LLM_MODEL, RETRIEVER_TOP_K
 from retrievers.semantic import get_semantic_retriever
 
 
@@ -27,7 +27,11 @@ class RAGPipeline:
         self.retriever = get_semantic_retriever(k=k)
         self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
 
-    def answer(self, question: str) -> str:
+    def answer(
+        self,
+        question: str,
+        history: Sequence[tuple[str, str]] | None = None,
+    ) -> str:
         """Retrieve relevant clauses and generate an answer with citations."""
 
         # 1. Retrieve top‑k chunks
@@ -56,8 +60,16 @@ class RAGPipeline:
                     "請用條理清楚的中文回答，並在最後列出你引用的條款編號與關鍵原文。"
                 ),
             ),
-            ("user", f"{context}\n\n問題：{question}"),
         ]
+
+        recent_history = list(history or [])[-CHAT_HISTORY_WINDOW:]
+        for user_message, assistant_message in recent_history:
+            if user_message:
+                messages.append(("user", user_message))
+            if assistant_message:
+                messages.append(("assistant", assistant_message))
+
+        messages.append(("user", f"{context}\n\n問題：{question}"))
 
         resp = self.llm.invoke(messages)
         return resp.content

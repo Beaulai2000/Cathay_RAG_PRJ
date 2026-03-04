@@ -23,6 +23,9 @@ EMBEDDING_MODEL = os.environ.get("CATHAY_RAG_EMBEDDING_MODEL", "text-embedding-3
 # Number of chunks retrieved for each user question by default.
 RETRIEVER_TOP_K = int(os.environ.get("CATHAY_RAG_RETRIEVER_TOP_K", "5"))
 
+# Number of previous conversation turns to include in the chat prompt.
+CHAT_HISTORY_WINDOW = int(os.environ.get("CATHAY_RAG_CHAT_HISTORY_WINDOW", "3"))
+
 
 # === Chunking ===
 

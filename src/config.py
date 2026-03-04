@@ -1,8 +1,4 @@
-"""
-
-- Change gpt model and embedding model later for better performance
-
-"""
+"""Configuration for the Cathay travel insurance RAG prototype."""
 
 import os
 from pathlib import Path
@@ -10,7 +6,7 @@ from pathlib import Path
 # === Models ===
 
 # LLM used to generate answers
-LLM_MODEL = os.environ.get("CATHAY_RAG_LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.environ.get("CATHAY_RAG_LLM_MODEL", "gpt-4.1")
 
 # Embedding model for semantic search
 EMBEDDING_MODEL = os.environ.get("CATHAY_RAG_EMBEDDING_MODEL", "text-embedding-3-small")

@@ -18,6 +18,14 @@ LLM_MODEL = os.environ.get("CATHAY_RAG_LLM_MODEL", "gpt-4o-mini")
 EMBEDDING_MODEL = os.environ.get("CATHAY_RAG_EMBEDDING_MODEL", "text-embedding-3-small")
 
 
+# === Chunking ===
+
+# Default chunking settings for policy ingestion.
+# This project uses article-aware chunking first, then sub-splits long articles.
+CHUNK_SIZE = int(os.environ.get("CATHAY_RAG_CHUNK_SIZE", "700"))
+CHUNK_OVERLAP = int(os.environ.get("CATHAY_RAG_CHUNK_OVERLAP", "100"))
+
+
 # === Paths ===
 
 # Project root = directory containing this file's parent (src/..)

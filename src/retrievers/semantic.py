@@ -13,15 +13,16 @@ from __future__ import annotations
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-from config import EMBEDDING_MODEL, INDEX_DIR
+from config import EMBEDDING_MODEL, INDEX_DIR, RETRIEVER_TOP_K
 
 
-def get_semantic_retriever(k: int = 5):
+def get_semantic_retriever(k: int | None = None):
     """Return a LangChain retriever over the policy index.
 
     Assumes that the index has been built and persisted under `INDEX_DIR`.
     """
 
+    k = k or RETRIEVER_TOP_K
     embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
     vectordb = Chroma(
         collection_name="travel_policy",

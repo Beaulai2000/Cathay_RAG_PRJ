@@ -15,14 +15,15 @@ from typing import List
 
 from langchain_openai import ChatOpenAI
 
-from config import LLM_MODEL
+from config import LLM_MODEL, RETRIEVER_TOP_K
 from retrievers.semantic import get_semantic_retriever
 
 
 class RAGPipeline:
     """Simple RAG pipeline for the travel insurance policy."""
 
-    def __init__(self, k: int = 5) -> None:
+    def __init__(self, k: int | None = None) -> None:
+        k = k or RETRIEVER_TOP_K
         self.retriever = get_semantic_retriever(k=k)
         self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
 

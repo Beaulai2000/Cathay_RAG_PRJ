@@ -167,7 +167,11 @@ def preview_chunks(chunks: List[str], limit: int = 3, preview_len: int = 160) ->
         print(f"[INFO] Preview: {snippet}")
 
 
-def build_index() -> None:
+def build_index(
+    chunk_size: int | None = None,
+    overlap: int | None = None,
+    preview_limit: int = 3,
+) -> None:
     """Build (or rebuild) the semantic index for the policy text.
 
     Steps:
@@ -180,12 +184,16 @@ def build_index() -> None:
     with metadata including a sequential chunk_id.
     """
 
+    chunk_size = chunk_size or CHUNK_SIZE
+    overlap = overlap or CHUNK_OVERLAP
+
     print(f"[INFO] Reading cleaned policy from {DEFAULT_POLICY_CLEAN_PATH}")
     text = read_policy_text()
-    chunks = article_aware_chunk(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP)
-    print(f"[INFO] Chunk settings: chunk_size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP}")
+    chunks = article_aware_chunk(text, chunk_size=chunk_size, overlap=overlap)
+    print(f"[INFO] Chunk settings: chunk_size={chunk_size}, overlap={overlap}")
     print(f"[INFO] Split policy into {len(chunks)} chunks")
-    preview_chunks(chunks)
+    if preview_limit > 0:
+        preview_chunks(chunks, limit=preview_limit)
 
     # Prepare documents and metadata
     from langchain_core.documents import Document

@@ -1,9 +1,7 @@
-"""Configuration for the Cathay travel insurance RAG prototype.
+"""
 
-Notes:
-- This module centralizes model names and index paths so they can be
-  changed in one place.
 - Change gpt model and embedding model later for better performance
+
 """
 
 import os

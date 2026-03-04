@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 venv/
+.gradio/
 
 data/index/
 data/policy_raw/

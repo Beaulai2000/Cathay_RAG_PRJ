@@ -83,6 +83,20 @@ POLICY_CLEAN_DIR = DATA_DIR / "policy_clean"
 
 # Vector index path (for Chroma or similar)
 INDEX_DIR = DATA_DIR / "index"
+INDEX_METADATA_FILENAME = "index_meta.json"
 
 # Default cleaned policy file (you can change this when you have the doc)
 DEFAULT_POLICY_CLEAN_PATH = POLICY_CLEAN_DIR / "policy_clean.txt"
+
+
+def sanitize_model_name(model_name: str) -> str:
+    """Convert a model name into a filesystem-safe directory name."""
+
+    return model_name.replace("/", "_").replace("-", "_").replace(".", "_")
+
+
+def get_index_dir(embedding_model: str | None = None) -> Path:
+    """Return the model-specific Chroma index directory."""
+
+    model_name = embedding_model or EMBEDDING_MODEL
+    return INDEX_DIR / sanitize_model_name(model_name)

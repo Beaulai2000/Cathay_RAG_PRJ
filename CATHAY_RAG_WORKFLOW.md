@@ -1,355 +1,297 @@
-# Cathay Travel Insurance RAG – Project Workflow & Architecture
+# Cathay Travel Insurance RAG Workflow
 
-> 狀態：截至 2026-03-04 晚上（你剛完成 history + section-aware RAG、Gradio share 等改動）
+> Status: updated on 2026-03-05 after section-aware retrieval, clarification logic, benchmark v1/v2, and model-specific index handling.
 
-這份檔案是給**未來的你**看的，讓你一眼了解：
+This file is the working memory for the project. It records:
 
-- 這個專案現在長什麼樣子
-- 你已經做了哪些設計 / 決策
-- 要怎麼跑整套 RAG（CLI + Gradio）
-- 之後可以往哪裡優化
+- what the current architecture does
+- why specific design decisions were made
+- how to run ingestion / CLI / Gradio / evaluation scripts
+- what configuration is currently recommended
 
-README.md 保留原本的課程 / idea；這份是你的**工程實作紀錄**。
+## 1. Project goal
 
----
+Build a RAG chatbot for the Cathay travel inconvenience insurance policy that:
 
-## 1. 專案目標 & 總體架構
+- answers policy questions in Chinese
+- cites the relevant clause headings
+- handles ambiguous user phrasing better than a naive single-turn semantic search
 
-### 1.1 專案目標
+## 2. Current high-level flow
 
-- 針對 **國泰旅遊不便險條款**，打造一個：
-  - 可以自然語言提問的 Q&A chatbot
-  - 背後使用 **RAG（Retrieval-Augmented Generation）**，從條款文本中找答案
-  - 能附上 **「第幾條」** 的引用，讓使用者知道依據來自哪個條文
+1. Extract and clean policy text
+2. Chunk the cleaned policy with article-aware chunking
+3. Build a Chroma vector index
+4. Retrieve relevant chunks with optional section filtering
+5. Generate an answer with an OpenAI chat model
+6. Expose the flow through CLI and Gradio
 
-### 1.2 高層架構
+## 3. Current default production config
 
-整體 flow 可以簡化成：
+The current default configuration in [`src/config.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/config.py) is:
 
-1. **Ingestion（索引建立）**
-   - 從 PDF / 原始保單 → 清洗後文字檔 → 切 chunk（條文感知） → 建立 Chroma 向量索引
+- `LLM_MODEL = "gpt-4.1"`
+- `EMBEDDING_MODEL = "text-embedding-3-small"`
+- `CHUNK_SIZE = 700`
+- `CHUNK_OVERLAP = 100`
+- `RETRIEVER_TOP_K = 5`
+- `CHAT_HISTORY_WINDOW = 3`
 
-2. **Retrieval（檢索）**
-   - 根據使用者問題（＋歷史上下文）
-   - 使用 semantic search，找出最相關的條款 chunk
-   - 支援「保險項目（section）」的意圖判斷與篩選
+Why this config:
 
-3. **Answer Generation（回答）**
-   - 系統訊息：保險專員角色 + 嚴格依據條款回答的指示
-   - 使用者訊息：條款 context ＋ 問題（＋過往對話）
-   - 使用 OpenAI Chat 模型產生中文回答
-   - 引導模型在答案中附上引用條款
+- `gpt-4.1` gave the best answer quality / cost balance in the current evals
+- `text-embedding-3-small` was enough for this single-policy knowledge base
+- `700 / 100` was the most balanced chunk setup across the benchmark runs
 
-4. **介面**
-   - CLI：終端機互動
-   - Gradio：web-based chat UI，可 share link demo
+Low-cost fallback:
 
----
+- `gpt-4o-mini + text-embedding-3-small + 700 / 100`
 
-## 2. 專案結構概覽
+## 4. Key files
 
-專案根目錄的重點：
+- [`src/config.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/config.py)
+  Central configuration for models, chunking, retrieval, sections, and paths.
 
-- `README.md` – 原始課程/idea 說明（保留，不覆蓋）
-- `requirements.txt` – 依賴套件（含 langchain、chroma、gradio 等）
-- `data/`
-  - `policy_raw/` – 原始保單 PDF 或 text（透過 `.gitignore` 排除版本控制）
-  - `policy_clean/` – 清洗後的條款純文字
-  - `index/` – Chroma 向量索引（亦被 `.gitignore` 排除）
-- `notebooks/` – 可放實驗 notebook（目前乾淨）
-- `src/`
-  - `config.py` – 專案各種設定（模型、路徑、chunking、section、history window 等）
-  - `extract_policy_from_pdf.py` – 從 PDF 抽取 + 清洗條款
-  - `ingestion.py` – 將清洗後條款切 chunk、建立向量索引
-  - `retrievers/semantic.py` – 取得 semantic retriever，支援 section filter
-  - `rag_pipeline.py` – **RAG 核心 pipeline**（history + section-aware + clarification）
-  - `cli.py` – CLI 入口（`python -m src.cli`）
-  - `gradio_app.py` – Gradio UI 入口（`python -m src.gradio_app`）
+- [`src/ingestion.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/ingestion.py)
+  Reads the cleaned policy text, splits it into chunks, assigns metadata, and builds the Chroma index.
 
----
+- [`src/retrievers/semantic.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/retrievers/semantic.py)
+  Loads the semantic retriever with optional section filtering.
 
-## 3. 設定與共用配置（`src/config.py`）
+- [`src/rag_pipeline.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/rag_pipeline.py)
+  Main RAG orchestration: query normalization, clarification, retrieval, history handling, and answer generation.
 
-你把許多「之後會想調整」的東西抽到 `config.py`：
+- [`src/gradio_app.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/gradio_app.py)
+  Gradio chat UI.
 
-- **模型設定**：
-  - `LLM_MODEL` – 例如 `gpt-4o-mini`（或未來的其他模型）
-  - `EMBEDDING_MODEL` – 例如 `text-embedding-3-small`
+- [`src/cli.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/cli.py)
+  CLI entrypoint.
 
-- **Chunking 設定**：
-  - `CHUNK_SIZE` – 預設 `700` 字元
-  - `CHUNK_OVERLAP` – 預設 `100` 字元
-  - 可以透過環境變數 `CATHAY_RAG_CHUNK_SIZE`、`CATHAY_RAG_CHUNK_OVERLAP` 調整
+## 5. Ingestion and indexing
 
-- **路徑設定**：
-  - `PROJECT_ROOT`
-  - `DATA_DIR`
-  - `DEFAULT_POLICY_CLEAN_PATH`
-  - `INDEX_DIR` – Chroma 向量庫儲存路徑
+### 5.1 Chunking strategy
 
-- **RAG 相關設定**：
-  - `RETRIEVER_TOP_K` – 一次取幾個 chunk（預設 5）
-  - `CHAT_HISTORY_WINDOW` – LLM 看到的最近對話輪數（避免 prompt 過長）
-  - `INSURANCE_SECTIONS` – 條款中不同保險項目（例如班機延誤保險、行李延誤保險...）
-  - `SECTION_ALIASES` – 各種口語說法 → 正式 section 名稱的 mapping
+The project does not primarily rely on blank-paragraph chunking anymore.
 
-這讓你之後要調整行為，只要改 `config.py` 或環境變數即可，不必重寫 code。
+Current approach:
 
----
+- first split by article headings such as `第二十七條 ...`
+- keep short clauses intact
+- sub-split long clauses line by line with overlap
 
-## 4. Ingestion：條文切分與索引建立（`src/ingestion.py`）
+Metadata stored per chunk:
 
-### 4.1 條文讀取
+- `chunk_id`
+- `article_id`
+- `section`
 
-- `read_policy_text(path: Path | None = None) -> str`
-  - 預設從 `DEFAULT_POLICY_CLEAN_PATH` 讀取清洗後的條款文字
+### 5.2 Model-specific index directories
 
-### 4.2 Chunking 策略
+Indexes are now stored per embedding model under [`data/index`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/data/index).
 
-你設計了兩層的 chunking：
+Examples:
 
-1. **`naive_paragraph_chunk`**（備用方案）
-   - 以空行分段（適用於有明顯段落的文本）
-   - 使用 `chunk_size` + `overlap` 控制 chunk 長度與重疊
+- `data/index/text_embedding_3_small/`
+- `data/index/text_embedding_3_large/`
 
-2. **`article_aware_chunk`**（主要方案）
-   - 使用正則 `ARTICLE_HEADING_RE` 偵測條文標題，例如：
-     - `第X條 ...`
-   - 先按條文標題切成「條文為單位」的段落
-   - 若單一條文太長，再以行為單位做次級切分，並加上重疊（避免句子被硬切斷）
-   - 若完全偵測不到條文標題，就 fallback 回 `naive_paragraph_chunk`
+Reason:
 
-### 4.3 Metadata & 預覽
+- evaluation scripts were rebuilding the same Chroma directory with different embedding dimensions
+- that caused runtime failures such as `Collection expecting embedding with dimension of 3072, got 1536`
+- separating indexes by embedding model prevents eval runs from breaking the default Gradio app
 
-- `extract_article_id(chunk: str) -> str`
-  - 回傳 chunk 的第一行條文標題（如果符合條文 regex）
-  - 用於 metadata 的 `article_id`
+Each built index also writes a small `index_meta.json` file with:
 
-- `preview_chunks(chunks: List[str], ...)`
-  - 印出前幾個 chunk 的長度與前幾十個字，方便你 check 切得好不好
+- embedding model
+- chunk size
+- overlap
+- chunk count
 
-### 4.4 建立 Chroma 向量庫
+### 5.3 Build command
 
-- `build_index()` 主要流程：
-
-  1. 讀取清洗後條款文本
-  2. 使用 `article_aware_chunk` 依 `CHUNK_SIZE` / `CHUNK_OVERLAP` 切 chunk
-  3. 把每個 chunk 包成 `Document`：
-     - `page_content = chunk`
-     - `metadata = {"chunk_id": i, "article_id": extract_article_id(chunk)}`
-  4. 建立 `OpenAIEmbeddings(model=EMBEDDING_MODEL)`
-  5. 使用 `Chroma` 建立/重建 collection：
-     - 每次先 `delete_collection()` 再從頭加 documents（避免舊版 chunk 混進來）
-
-執行方式：
+Default build:
 
 ```bash
 python -m src.ingestion
 ```
 
----
+Build for another embedding model:
 
-## 5. Retrieval：語意檢索與保險項目（`src/retrievers/semantic.py`）
-
-> 這裡只記設計概念，詳細實作看檔案。
-
-- `get_semantic_retriever(k: int = RETRIEVER_TOP_K, section: str | None = None)`
-  - 從 `INDEX_DIR` 載入 Chroma 向量庫
-  - 若有指定 `section`，就只檢索該 section 相關的 chunks
-  - 回傳一個 retriever，可透過 `.invoke(query)` 或 `.get_relevant_documents(query)` 使用
-
-這個設計讓你之後可以：
-
-- 對不同保險項目（section）建立同一個 collection，但在 query 時做過濾
-- 或未來延伸為多個 collection / 多政策切分
-
----
-
-## 6. RAG Pipeline：History + Section-aware + Clarification（`src/rag_pipeline.py`）
-
-這是目前你花最多心力的部分，也是面試可以重點講的地方。
-
-### 6.1 Pipeline 初始化
-
-```python
-class RAGPipeline:
-    def __init__(self, k: int | None = None) -> None:
-        self.k = k or RETRIEVER_TOP_K
-        self.retriever = get_semantic_retriever(k=self.k)
-        self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
+```bash
+CATHAY_RAG_EMBEDDING_MODEL="text-embedding-3-large" python -m src.ingestion
 ```
 
-- 預設使用 config 中的 `RETRIEVER_TOP_K` 與 `LLM_MODEL`
-- `retriever` 可以被 section-aware 版本覆蓋（見下）
+## 6. Retrieval design
 
-### 6.2 Answer 流程總覽
+The retriever is semantic search over Chroma with top-k retrieval.
 
-```python
-def answer(self, question: str, history: Sequence[Any] | None = None) -> str:
-    # 1) 處理 follow-up 問題與術語正規化
-    question = rewrite_followup_question(question, history=history)
-    question = normalize_question_terms(question)
+Current retriever behavior:
 
-    # 2) 判斷保險 section 並處理模糊問句
-    section = infer_requested_section(question, history=history)
-    if not section and is_ambiguous_delay_question(question):
-        return build_delay_clarification_message()
-    if not section and is_ambiguous_section_question(question):
-        return build_section_clarification_message()
+- loads the index matching the active embedding model
+- can apply `filter={"section": ...}` when a section is inferred
+- uses `.invoke(query)` with the current LangChain retriever API
 
-    retriever = get_semantic_retriever(k=self.k, section=section) if section else self.retriever
-    docs = retriever.invoke(question)
-    if not docs:
-        return "目前找不到與條款內容相符的資訊，建議洽詢客服或查看正式保單。"
+If the correct index does not exist, the retriever now returns a clear rebuild instruction instead of failing with an opaque traceback.
 
-    # 3) 組條款 context（含 article_id）
-    ...
+## 7. RAG pipeline behavior
 
-    # 4) 組 messages：system + history + 當前 context+question
-    ...
+[`src/rag_pipeline.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/rag_pipeline.py) now does more than naive retrieve-then-answer.
 
-    resp = self.llm.invoke(messages)
-    return resp.content
+### 7.1 Query normalization
+
+The pipeline rewrites informal terms into the policy's formal section names.
+
+Examples:
+
+- `信用卡盜刷` -> `信用卡盜用保險`
+- `護照遺失` -> `旅行文件損失保險`
+- `手機被偷` -> `行動電話被竊損失保險`
+
+### 7.2 Section-aware retrieval
+
+If the user clearly refers to a specific policy section, retrieval is filtered to that section.
+
+This reduces cross-section contamination for questions like:
+
+- `信用卡盜用有哪些不可理賠範圍？`
+- `特殊活動取消慰問保險的承保範圍是什麼？`
+
+### 7.3 Clarification for ambiguous questions
+
+The pipeline does not always answer immediately.
+
+It first asks for clarification when the question is too broad, for example:
+
+- `哪些原因屬於不可理賠範圍？`
+- `旅遊延誤賠償怎麼算？`
+
+There are currently two clarification types:
+
+- generic section clarification
+- delay clarification (`班機延誤保險` vs `行李延誤保險`)
+
+### 7.4 Follow-up rewrite
+
+If the user only replies with a section name after a clarification question, the pipeline rewrites that short reply into a full retrieval query.
+
+Examples:
+
+- user: `哪些原因屬於不可理賠範圍？`
+- assistant: asks which insurance section
+- user: `信用卡盜用保險`
+- rewritten query: `信用卡盜用保險有哪些不可理賠範圍？`
+
+### 7.5 Conversation history
+
+The pipeline accepts `history` and injects the recent turns into the chat messages sent to the LLM.
+
+This supports:
+
+- follow-up clarification
+- history-aware answers
+- multi-turn chat in Gradio
+
+### 7.6 Error handling
+
+The pipeline now catches index/model mismatch cases and returns a rebuild instruction instead of exposing a raw Chroma dimension traceback to the user.
+
+## 8. CLI and Gradio
+
+CLI:
+
+```bash
+python -m src.cli
 ```
 
-### 6.3 History 支援
+Gradio:
 
-- `answer` 接受 `history: Sequence[Any] | None`
-- 支援兩種格式：
-  - Gradio 風格：`[(user, assistant), ...]`
-  - LangChain 風格：`{"role": "user"/"assistant", "content": "..."}`
-- 只取最近 `CHAT_HISTORY_WINDOW` 輪
-- 組 messages 時：
-  - 先加上 `system` 指示（保險專員、只依據條款、不亂猜、最後附條款編號等）
-  - 再把 history 轉成 chat messages（依序添加 user / assistant）
-  - 最後加入這一輪的 `user`：包含條款 context＋問題
+```bash
+python -m src.gradio_app
+```
 
-### 6.4 保險項目（section）意圖判斷
+Notes:
 
-輔助函式：
+- Gradio currently launches with `share=True`
+- `chat_fn` passes `history` into `PIPELINE.answer(...)`
 
-- `infer_section_from_text(text: str) -> str | None`
-  - 利用 `SECTION_ALIASES` 與 `INSURANCE_SECTIONS`，從任意文字中猜使用者指的是哪個保險項目
+## 9. Evaluation workflow
 
-- `build_history_text(history) -> str`
-  - 把最近幾輪對話的文字串起來，用於意圖判斷
+### 9.1 Chunk-only sweep
 
-- `infer_requested_section(question, history) -> str | None`
-  - 先看當前問題，有就直接回 section
-  - 若沒有，再看 history 串起來的文字
+[`src/evaluate_chunk_configs.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/evaluate_chunk_configs.py)
 
-### 6.5 Follow-up 問題改寫（Rewrite）
+Tests:
 
-- `rewrite_followup_question(question, history)` 用來處理：
-  - 上一輪 assistant 問：「你想問的是哪一種保險？」
-  - 這一輪 user 只回：「班機延誤保險」或「行李延誤保險」
-- 流程：
-  1. 用 `infer_section_from_text` 判斷這是不是一個純粹的 section 名稱
-  2. 確認上一輪 assistant 是否剛好是在做澄清（`last_assistant_message_is_clarification` / `last_assistant_message_is_delay_clarification`）
-  3. 若是，就重寫成完整 query：
-     - 延誤相關：`"班機延誤保險什麼情況下可以申請理賠？"`
-     - 其他情況：`"班機延誤保險有哪些不可理賠範圍？"`
+- fixed 5 questions
+- chunk configs:
+  - `500 / 100`
+  - `700 / 100`
+  - `900 / 120`
 
-### 6.6 模糊問題澄清
+Outputs:
 
-- `is_ambiguous_section_question(question)`：
-  - 抓出關鍵字："不可理賠"、"不保事項"、"除外責任"、"哪些原因" 等
-  - 若問這類問題但沒說哪個保險項目 → 視為模糊
-- `build_section_clarification_message()`：
-  - 回一段訊息：列出 `INSURANCE_SECTIONS` 中支援的保險項目，請使用者選
+- `data/evals/chunk_eval_*.json`
+- `data/evals/chunk_eval_*.md`
 
-- `is_ambiguous_delay_question(question)`：
-  - 若有 "旅遊延誤"、"延誤賠償" 等字眼
-  - 但沒有「班機延誤」或「行李延誤」
-- `build_delay_clarification_message()`：
-  - 回一段訊息：請使用者說清楚是「班機延誤保險」還是「行李延誤保險」，並提供範例問法
+### 9.2 Model + chunk sweep
 
----
+[`src/evaluate_model_chunk_configs.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/evaluate_model_chunk_configs.py)
 
-## 7. 介面：CLI 與 Gradio（`src/cli.py`, `src/gradio_app.py`）
+Tests:
 
-### 7.1 CLI
+- 6 model combinations
+- 3 chunk configurations
 
-- `src/cli.py`：
-  - 使用 `from .rag_pipeline import RAGPipeline`
-  - 跑法：
+Current model combinations:
 
-    ```bash
-    python -m src.cli
-    ```
+- `gpt-4o-mini + text-embedding-3-small`
+- `gpt-4o-mini + text-embedding-3-large`
+- `gpt-4.1 + text-embedding-3-small`
+- `gpt-4.1 + text-embedding-3-large`
+- `gpt-5 + text-embedding-3-small`
+- `gpt-5 + text-embedding-3-large`
 
-  - 每輪：
-    - 從輸入讀取一行問題
-    - 呼叫 `rag.answer(q)`（未來可擴充歷史支援）
-    - 印出回答
+Outputs:
 
-### 7.2 Gradio UI
+- `data/evals/model_chunk_eval_*.json`
+- `data/evals/model_chunk_eval_*.md`
 
-- `src/gradio_app.py`：
-  - `build_pipeline()` 建立 `RAGPipeline(k=5)`
-  - `PIPELINE = build_pipeline()`（全域 pipeline）
-  - `chat_fn(message, history)`：
-    - 現在會把 `history` 傳進 `PIPELINE.answer`（在某次改動中已完成）
-    - 回傳 answer 給 Gradio
-  - `main()` 建立 `gr.ChatInterface`，`demo.launch(share=True)`：
-    - 本機 UI + public share link
+### 9.3 Harder v2 benchmark
 
-- 執行方式：
+[`src/evaluate_model_chunk_configs_v2.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/evaluate_model_chunk_configs_v2.py)
 
-  ```bash
-  python -m src.gradio_app
-  ```
+Tests:
 
----
+- ambiguous queries
+- clarification behavior
+- follow-up rewriting
+- synonym handling
+- condition / exception questions
 
-## 8. 執行整套 RAG 的步驟
+Plan doc:
 
-1. **安裝依賴**
+- [`data/evals/model_chunk_eval_v2_plan.md`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/data/evals/model_chunk_eval_v2_plan.md)
 
-   ```bash
-   cd Cathay_RAG_PRJ
-   pip install -r requirements.txt
-   ```
+Analysis docs:
 
-2. **設定環境變數**
+- [`data/evals/model_chunk_eval_analysis_v1.md`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/data/evals/model_chunk_eval_analysis_v1.md)
+- [`data/evals/model_chunk_eval_analysis_v2.md`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/data/evals/model_chunk_eval_analysis_v2.md)
 
-   ```bash
-   export OPENAI_API_KEY="你的_API_Key"
-   # 可選：
-   # export CATHAY_RAG_CHUNK_SIZE=700
-   # export CATHAY_RAG_CHUNK_OVERLAP=100
-   ```
+## 10. Current benchmark conclusions
 
-3. **建立索引**
+From the current v1 and v2 evals:
 
-   ```bash
-   python -m src.ingestion
-   ```
+- `700 / 100` is still the best default chunk setup
+- `text-embedding-3-large` did not show enough gain to justify becoming the default
+- `gpt-4.1` is the best current main model for answer quality / cost balance
+- `gpt-4o-mini` remains the cheapest usable baseline
+- much of the system quality now comes from pipeline logic, not just from swapping to bigger models
 
-4. **跑 CLI Demo**
+## 11. Known next experiments
 
-   ```bash
-   python -m src.cli
-   ```
+Good next steps:
 
-5. **跑 Gradio UI**
-
-   ```bash
-   python -m src.gradio_app
-   ```
-
----
-
-## 9. 之後可以做的事（TODO / 想法）
-
-- [ ] 在答案中**由程式**依 `docs` 的 metadata 自動列出引用條款，而不是完全依賴 LLM。
-- [ ] 實作 query rewrite：
-  - 使用 LLM + history，把 follow-up 問題改寫成完整 query，再做 retrieval。
-- [ ] 增加更多 domain-specific test cases，用小腳本跑 QA sanity check。
-- [ ] 把這個專案整理成 portfolio：
-  - 清楚描述：條文感知 chunking、section-aware retrieval、clarification strategies、history handling。
-- [ ] 若有需要，再包裝成 Docker image 或部署成簡單的 web service。
-
----
-
-> 如果之後架構有大改，可以在這份檔案下面再加「版本變更紀錄」，幫自己記錄你是怎麼從 v1 → v2 → v3 演進的。
+- test `k = 3 / 5 / 7`
+- create a tougher v3 benchmark that stresses retrieval failures and citation accuracy
+- make citations more deterministic from retrieved metadata instead of relying on the model
+- consider query rewriting with a dedicated LLM step before retrieval

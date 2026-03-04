@@ -15,8 +15,8 @@ from typing import Any, List, Sequence
 
 from langchain_openai import ChatOpenAI
 
-from .config import CHAT_HISTORY_WINDOW, INSURANCE_SECTIONS, LLM_MODEL, RETRIEVER_TOP_K, SECTION_ALIASES
-from .retrievers.semantic import get_semantic_retriever
+from .config import CHAT_HISTORY_WINDOW, EMBEDDING_MODEL, INSURANCE_SECTIONS, LLM_MODEL, RETRIEVER_TOP_K, SECTION_ALIASES
+from .retrievers.semantic import build_reindex_command, get_semantic_retriever
 
 
 class RAGPipeline:
@@ -30,8 +30,8 @@ class RAGPipeline:
     ) -> None:
         self.k = k or RETRIEVER_TOP_K
         self.embedding_model = embedding_model
-        self.retriever = get_semantic_retriever(k=self.k, embedding_model=embedding_model)
         self.llm = ChatOpenAI(model=llm_model or LLM_MODEL, temperature=0)
+        self._retriever = None
 
     def answer(
         self,
@@ -50,12 +50,15 @@ class RAGPipeline:
         if not section and is_ambiguous_section_question(question):
             return build_section_clarification_message()
 
-        retriever = (
-            get_semantic_retriever(k=self.k, section=section, embedding_model=self.embedding_model)
-            if section
-            else self.retriever
-        )
-        docs = retriever.invoke(question)
+        retriever = self.get_retriever(section=section)
+        try:
+            docs = retriever.invoke(question)
+        except FileNotFoundError as exc:
+            return str(exc)
+        except Exception as exc:
+            if "dimension" in str(exc):
+                return build_embedding_mismatch_message(self.embedding_model or EMBEDDING_MODEL)
+            raise
 
         if not docs:
             return "目前找不到與條款內容相符的資訊，建議洽詢客服或查看正式保單。"
@@ -102,6 +105,26 @@ class RAGPipeline:
 
         resp = self.llm.invoke(messages)
         return resp.content
+
+    def get_retriever(self, section: str | None = None):
+        """Build the retriever lazily so UI startup does not fail on index issues."""
+
+        if section:
+            return get_semantic_retriever(k=self.k, section=section, embedding_model=self.embedding_model)
+
+        if self._retriever is None:
+            self._retriever = get_semantic_retriever(k=self.k, embedding_model=self.embedding_model)
+        return self._retriever
+
+
+def build_embedding_mismatch_message(embedding_model: str) -> str:
+    """Return a user-facing message for index/model dimension mismatches."""
+
+    return (
+        "目前的向量索引和正在使用的 embedding model 不一致。"
+        f"\n目前 embedding model: {embedding_model}"
+        f"\n請先重建索引：{build_reindex_command(embedding_model)}"
+    )
 
 
 def infer_requested_section(question: str, history: Sequence[Any] | None = None) -> str | None:

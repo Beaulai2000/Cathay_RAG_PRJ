@@ -12,6 +12,7 @@ leave semantic/recursive chunking as future work.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import List
@@ -25,7 +26,9 @@ from .config import (
     DEFAULT_POLICY_CLEAN_PATH,
     EMBEDDING_MODEL,
     INDEX_DIR,
+    INDEX_METADATA_FILENAME,
     INSURANCE_SECTIONS,
+    get_index_dir,
 )
 
 
@@ -167,6 +170,27 @@ def preview_chunks(chunks: List[str], limit: int = 3, preview_len: int = 160) ->
         print(f"[INFO] Preview: {snippet}")
 
 
+def write_index_metadata(
+    index_dir: Path,
+    *,
+    embedding_model: str,
+    chunk_size: int,
+    overlap: int,
+    chunk_count: int,
+) -> None:
+    """Write a small metadata file next to the Chroma index."""
+
+    metadata = {
+        "embedding_model": embedding_model,
+        "chunk_size": chunk_size,
+        "overlap": overlap,
+        "chunk_count": chunk_count,
+        "collection_name": "travel_policy",
+    }
+    metadata_path = index_dir / INDEX_METADATA_FILENAME
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def build_index(
     chunk_size: int | None = None,
     overlap: int | None = None,
@@ -179,7 +203,7 @@ def build_index(
     1. Load cleaned policy text from DEFAULT_POLICY_CLEAN_PATH.
     2. Chunk it with article-aware splitting.
     3. Create a Chroma vector store with OpenAI embeddings and persist
-       it under INDEX_DIR.
+       it under a model-specific subdirectory inside INDEX_DIR.
 
     This is a simple baseline: one document chunk = one Chroma document,
     with metadata including a sequential chunk_id.
@@ -188,6 +212,7 @@ def build_index(
     chunk_size = chunk_size or CHUNK_SIZE
     overlap = overlap or CHUNK_OVERLAP
     embedding_model = embedding_model or EMBEDDING_MODEL
+    index_dir = get_index_dir(embedding_model)
 
     print(f"[INFO] Reading cleaned policy from {DEFAULT_POLICY_CLEAN_PATH}")
     text = read_policy_text()
@@ -212,13 +237,14 @@ def build_index(
 
     embeddings = OpenAIEmbeddings(model=embedding_model)
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    index_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[INFO] Building Chroma index in {INDEX_DIR}")
+    print(f"[INFO] Building Chroma index in {index_dir}")
     # Open the collection first so old data can be cleared before rebuilding.
     vectordb = Chroma(
         collection_name="travel_policy",
         embedding_function=embeddings,
-        persist_directory=str(INDEX_DIR),
+        persist_directory=str(index_dir),
     )
     # Rebuild from scratch each run to avoid mixing old and new chunk sets.
     vectordb.delete_collection()
@@ -228,11 +254,18 @@ def build_index(
         documents=docs,
         embedding=embeddings,
         collection_name="travel_policy",
-        persist_directory=str(INDEX_DIR),
+        persist_directory=str(index_dir),
     )
     # Note: Chroma.from_documents() with a persist_directory will write
     # the index to disk; an explicit persist() call is not needed with
     # the langchain_chroma integration we are using.
+    write_index_metadata(
+        index_dir,
+        embedding_model=embedding_model,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        chunk_count=len(chunks),
+    )
     print("[INFO] Index build complete.")
 
 

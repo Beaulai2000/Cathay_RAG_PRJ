@@ -115,7 +115,9 @@ def build_index() -> None:
         collection_name="travel_policy",
         persist_directory=str(INDEX_DIR),
     )
-    vectordb.persist()
+    # Note: Chroma.from_documents() with a persist_directory will write
+    # the index to disk; an explicit persist() call is not needed with
+    # the langchain_chroma integration we are using.
     print("[INFO] Index build complete.")
 
 

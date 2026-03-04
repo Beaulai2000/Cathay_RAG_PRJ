@@ -8,7 +8,7 @@ Usage (from project root):
 
 from __future__ import annotations
 
-from rag_pipeline import RAGPipeline
+from .rag_pipeline import RAGPipeline
 
 
 def main() -> None:

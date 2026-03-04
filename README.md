@@ -225,12 +225,12 @@ Once the ingestion and retrieval modules are implemented, the basic demo flow wi
 
 1. Build the index:
    ```bash
-   python src/ingestion.py
+   python -m src.ingestion
    ```
 
 2. Start a CLI chat:
    ```bash
-   python src/cli.py
+   python -m src.cli
    ```
 
 3. Ask questions such as:

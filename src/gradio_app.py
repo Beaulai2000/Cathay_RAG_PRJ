@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import gradio as gr
 
-from rag_pipeline import RAGPipeline
+from .rag_pipeline import RAGPipeline
 
 
 def build_pipeline() -> RAGPipeline:
@@ -55,7 +55,7 @@ def main() -> None:
         ),
     )
 
-    demo.launch(share=False)
+    demo.launch(share=True)
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@ Core code changes completed so far:
 
 6. User-facing entrypoints were aligned:
    - CLI in [`src/cli.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/cli.py)
-   - Gradio UI in [`src/gradio_app.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/gradio_app.py) now passes chat history to pipeline.
+   - Gradio UI in [`src/gradio_app.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/gradio_app.py) now uses a Blocks layout with runtime parameter controls.
 
 7. Default serving configuration was finalized as:
    - `gpt-4.1`
@@ -238,6 +238,11 @@ Examples:
 
 The pipeline accepts `history` and injects the recent turns into the chat messages sent to the LLM.
 
+History length can be configured in two ways:
+
+- default from `CHAT_HISTORY_WINDOW` in config
+- overridden at runtime via `RAGPipeline(history_window=...)`
+
 This supports:
 
 - follow-up clarification
@@ -265,7 +270,15 @@ python -m src.gradio_app
 Notes:
 
 - Gradio currently launches with `share=True`
-- `chat_fn` passes `history` into `PIPELINE.answer(...)`
+- UI is implemented with `gr.Blocks` instead of a plain `ChatInterface`
+- runtime controls are available for:
+  - `k`
+  - `history_window`
+  - `chunk_size`
+  - `overlap`
+- presets can be applied with one click (`Baseline`, `Precision`, `Recall`, etc.)
+- index rebuild can be triggered from the UI when changing `chunk_size` / `overlap`
+- `chat_fn` passes `history` and runtime parameters into the pipeline
 
 ## 9. Evaluation workflow
 

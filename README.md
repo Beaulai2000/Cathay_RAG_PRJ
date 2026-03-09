@@ -3,9 +3,9 @@
 這是一個針對「國泰旅遊不便險條款」打造的 RAG 專案。  
 目標是讓使用者用自然語言提問，系統能根據條款內容回答，並附上條款依據。
 
-## 1. 目前你已完成的核心內容
+## 1. 目前已完成的核心內容
 
-你目前不是只有做基本 RAG，而是已經完成一個可 demo、可評估、可調參的版本：
+目前可調參的版本的RAG：
 
 - 條款抽取與清洗流程（PDF -> cleaned text）
 - 條文感知切塊（article-aware chunking）
@@ -79,7 +79,7 @@ data/
 
 ## 5. 快速開始
 
-1. 安裝依賴
+1. 安裝package
 
 ```bash
 pip install -r requirements.txt
@@ -143,7 +143,7 @@ python -m src.ingestion
 
 - 目前最平衡組合：`gpt-4.1 + text-embedding-3-small + 700/100`
 - 低成本 baseline：`gpt-4o-mini + text-embedding-3-small + 700/100`
-- 你的品質提升主要來自 pipeline 設計（澄清/rewrite/section routing），不只是換更大模型
+- 此Model的品質提升主要來自 pipeline 設計（澄清/rewrite/section routing），不只是換更大模型
 
 ## 9. 相關文件
 

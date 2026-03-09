@@ -70,6 +70,24 @@
 - 工具組合：`retriever.invoke` -> `if not docs` fallback
 - 結果：回覆「目前找不到相符條款」，避免幻覺式回答。
 
+## 對話控制 Scenario 詳解（兩頁 PNG，可直接放 PPT）
+
+![Dialog Control Scenarios 1-3](assets/slide_mockups/page04A_dialog_control_scenarios_1to3_purple.png)
+![Dialog Control Scenarios 4-6](assets/slide_mockups/page04B_dialog_control_scenarios_4to6_purple.png)
+
+### 第一頁（Scenario 1-3）
+- Scenario 1 問題明確：使用者直接點名險種，走 `infer_requested_section` + `get_retriever(section)` 直接檢索並回答。
+- Scenario 2 口語同義詞：先經過 `normalize_question_terms` + `SECTION_ALIASES`，再做 section 推斷與檢索。
+- Scenario 3 延誤類型不明：`if not section and is_ambiguous_delay_question`，先 `build_delay_clarification_message`。
+
+### 第二頁（Scenario 4-6）
+- Scenario 4 險種不明：`if not section and is_ambiguous_section_question`，先 `build_section_clarification_message`。
+- Scenario 5 澄清後短回覆：`rewrite_followup_question` + `last_assistant_message_is_clarification`，把短回覆改寫成完整檢索句。
+- Scenario 6 容錯與 fallback：處理 `FileNotFoundError`、embedding 維度不一致，以及 `if not docs` 的保守回覆。
+
+### 產圖指令（可重跑）
+- `python3 src/generate_dialog_control_scenario_slides.py`
+
 ---
 
 ## 1) 專案目標
@@ -181,6 +199,31 @@ sequenceDiagram
 - 先要求指定險種（避免回答過度泛化）。
 - 指定後輸出對應「特別不保事項」。
 - 來源示例：信用卡盜用為 `第五十八條`。
+
+### QA 截圖模板（可直接貼 Gradio 回答）
+
+![QA Screenshot Template](assets/slide_mockups/page05A_qa_examples_screenshot_template_purple.png)
+
+### 參數比較模板（k / history / chunk）
+
+![Parameter Comparison Template](assets/slide_mockups/page05B_param_comparison_template_purple.png)
+
+### 同題不同參數四宮格模板
+
+![Same Question Parameter Grid Template](assets/slide_mockups/page05C_same_question_param_grid_template_purple.png)
+
+### 單題參數比較模板（Q1 / Q2 / Q3）
+
+![Q1 Delay Param Template](assets/slide_mockups/page06Q1_delay_param_template_purple.png)
+![Q2 Baggage Claim Param Template](assets/slide_mockups/page06Q2_baggage_claim_param_template_purple.png)
+![Q3 Exclusion Param Template](assets/slide_mockups/page06Q3_exclusion_param_template_purple.png)
+
+### 建議測試順序（先小範圍 A/B）
+- Baseline：`k=5`、`chunk=700/100`、`history=3`。
+- 先測 `k`：只改 `k=3`、`k=8`，其餘固定 baseline。
+- 再測 `history_window`：`1` 與 `5`。
+- 若還要做 chunk 比較，再測：`500/100` 與 `900/120`。
+- 每次只改一個參數，問題固定使用 Q1 / Q2 / Q3，方便橫向比較。
 
 ---
 

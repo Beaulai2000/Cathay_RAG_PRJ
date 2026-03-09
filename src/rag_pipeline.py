@@ -27,9 +27,11 @@ class RAGPipeline:
         k: int | None = None,
         llm_model: str | None = None,
         embedding_model: str | None = None,
+        history_window: int | None = None,
     ) -> None:
         self.k = k or RETRIEVER_TOP_K
         self.embedding_model = embedding_model
+        self.history_window = history_window or CHAT_HISTORY_WINDOW
         self.llm = ChatOpenAI(model=llm_model or LLM_MODEL, temperature=0)
         self._retriever = None
 
@@ -85,7 +87,7 @@ class RAGPipeline:
             ),
         ]
 
-        recent_history = list(history or [])[-CHAT_HISTORY_WINDOW:]
+        recent_history = list(history or [])[-self.history_window:]
         for item in recent_history:
             if isinstance(item, dict):
                 role = item.get("role")

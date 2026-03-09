@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 venv/
 .gradio/
+assets/
+PPT_RAG_ARCHITECTURE.md
 
 data/index/
 data/policy_raw/

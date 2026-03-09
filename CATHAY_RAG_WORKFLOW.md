@@ -1,6 +1,6 @@
 # Cathay Travel Insurance RAG Workflow
 
-> Status: updated on 2026-03-05 after section-aware retrieval, clarification logic, benchmark v1/v2, and model-specific index handling.
+> Status: updated on 2026-03-09.
 
 This file is the working memory for the project. It records:
 
@@ -8,6 +8,59 @@ This file is the working memory for the project. It records:
 - why specific design decisions were made
 - how to run ingestion / CLI / Gradio / evaluation scripts
 - what configuration is currently recommended
+
+## 0. Change summary (code-only, for quick recap)
+
+This summary intentionally excludes:
+
+- presentation assets (`assets/*.svg`, `assets/*.png`)
+- slide/template generators for PPT
+- test/eval output files under `data/evals/*.json` and `data/evals/*.md`
+
+Core code changes completed so far:
+
+1. Project execution flow was standardized to module mode:
+   - `python -m src.ingestion`
+   - `python -m src.cli`
+   - `python -m src.gradio_app`
+   - internal imports were updated to package-relative style.
+
+2. Configuration was centralized in [`src/config.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/config.py):
+   - model defaults
+   - chunking parameters
+   - retriever top-k
+   - chat history window
+   - section names and alias mapping.
+
+3. Ingestion was upgraded in [`src/ingestion.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/ingestion.py):
+   - switched from naive paragraph split to article-aware chunking
+   - added metadata (`chunk_id`, `article_id`, `section`)
+   - added chunk preview logging
+   - added model-specific index directories and `index_meta.json`.
+
+4. Retrieval logic was improved in [`src/retrievers/semantic.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/retrievers/semantic.py):
+   - supports section filter
+   - uses current retriever API (`invoke`)
+   - resolves index path by embedding model
+   - returns actionable rebuild instructions when index is missing.
+
+5. RAG pipeline was expanded in [`src/rag_pipeline.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/rag_pipeline.py):
+   - system/user chat-role structure
+   - multi-turn history support
+   - section-aware query routing
+   - ambiguous question clarification (section and delay type)
+   - follow-up rewrite for short replies
+   - synonym normalization
+   - embedding/index mismatch handling.
+
+6. User-facing entrypoints were aligned:
+   - CLI in [`src/cli.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/cli.py)
+   - Gradio UI in [`src/gradio_app.py`](/Users/laipoyu/Desktop/LLM_Projects/Cathay_Rag_PRJ/Cathay_RAG_PRJ/src/gradio_app.py) now passes chat history to pipeline.
+
+7. Default serving configuration was finalized as:
+   - `gpt-4.1`
+   - `text-embedding-3-small`
+   - `chunk_size=700`, `overlap=100`.
 
 ## 1. Project goal
 

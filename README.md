@@ -27,6 +27,23 @@ Raw Policy -> Cleaned Text -> Chunking -> Chroma Index
                                       -> Answer + Clause Citations
 ```
 
+### 架構圖（Mermaid）
+
+```mermaid
+flowchart TD
+    A[Policy PDF/Text] --> B[extract_policy_from_pdf.py]
+    B --> C[policy_clean.txt]
+    C --> D[ingestion.py<br/>article-aware chunking]
+    D --> E[Chroma Index<br/>model-specific directory]
+    Q[User Question] --> F[rag_pipeline.py]
+    H[Chat History] --> F
+    F --> G[Query Normalize / Clarification / Section Inference]
+    G --> R[semantic retriever<br/>top-k + optional section filter]
+    E --> R
+    R --> L[ChatOpenAI]
+    L --> O[Answer + Clause Citations]
+```
+
 ## 3. 專案結構
 
 ```text
@@ -109,35 +126,7 @@ Gradio 目前可直接調：
 - Small Chunk（500/100，需重建）
 - Large Chunk（900/120，需重建）
 
-## 7. 評估腳本
-
-1. chunk 參數掃描
-
-```bash
-python -m src.evaluate_chunk_configs
-```
-
-2. model + chunk 組合掃描
-
-```bash
-python -m src.evaluate_model_chunk_configs
-```
-
-3. v2 對話/模糊問題 benchmark
-
-```bash
-python -m src.evaluate_model_chunk_configs_v2
-```
-
-4. retrieval-level evaluation（先看抓到的 chunks 對不對）
-
-```bash
-python -m src.evaluate_retrieval_v2
-```
-
-輸出會寫到 `data/evals/`。
-
-## 8. 常見問題
+## 7. 常見問題
 
 ### `Collection expecting embedding with dimension ...` 錯誤
 
@@ -150,12 +139,12 @@ python -m src.ingestion
 
 若你切換 embedding model，請用該 model 重建一次索引。
 
-## 9. 現況結論（依目前 benchmark）
+## 8. 現況結論（依目前 benchmark）
 
 - 目前最平衡組合：`gpt-4.1 + text-embedding-3-small + 700/100`
 - 低成本 baseline：`gpt-4o-mini + text-embedding-3-small + 700/100`
 - 你的品質提升主要來自 pipeline 設計（澄清/rewrite/section routing），不只是換更大模型
 
-## 10. 相關文件
+## 9. 相關文件
 
 - 完整工程工作紀錄：[`CATHAY_RAG_WORKFLOW.md`](CATHAY_RAG_WORKFLOW.md)

@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs>
+    <style>
+      .title { font: 700 36px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 600 20px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #334155; }
+      .head { font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #0f172a; }
+      .cell-title { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #0f172a; }
+      .cell-text { font: 500 15px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #334155; }
+      .small { font: 500 14px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", Arial, sans-serif; fill: #475569; }
+      .bg { fill: #f8fafc; }
+      .table { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 12; ry: 12; }
+      .headbox { fill: #e2e8f0; stroke: #94a3b8; stroke-width: 2; }
+      .scenario { fill: #eef2ff; stroke: #a5b4fc; stroke-width: 1.5; }
+      .tool { fill: #ecfeff; stroke: #67e8f9; stroke-width: 1.5; }
+      .result { fill: #f0fdf4; stroke: #86efac; stroke-width: 1.5; }
+      .divider { stroke: #cbd5e1; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1800" height="1200" class="bg" />
+  <text x="900" y="58" text-anchor="middle" class="title">RAG 工具組合情境圖（Scenario → Tools → Result）</text>
+  <text x="900" y="92" text-anchor="middle" class="subtitle">以你目前 `rag_pipeline.py` 的實作邏輯整理</text>
+
+  <rect x="70" y="120" width="1660" height="1020" class="table" />
+
+  <!-- Header -->
+  <rect x="90" y="150" width="520" height="60" class="headbox" />
+  <rect x="620" y="150" width="560" height="60" class="headbox" />
+  <rect x="1190" y="150" width="520" height="60" class="headbox" />
+  <text x="350" y="188" text-anchor="middle" class="head">Scenario（觸發情境）</text>
+  <text x="900" y="188" text-anchor="middle" class="head">Tools（使用工具/函式）</text>
+  <text x="1450" y="188" text-anchor="middle" class="head">Result（系統結果）</text>
+
+  <!-- Row 1 -->
+  <rect x="90" y="220" width="520" height="120" class="scenario" />
+  <rect x="620" y="220" width="560" height="120" class="tool" />
+  <rect x="1190" y="220" width="520" height="120" class="result" />
+  <text x="110" y="252" class="cell-title">1. 問題明確</text>
+  <text x="110" y="278" class="cell-text">例：班機延誤保險有哪些不保事項？</text>
+  <text x="640" y="252" class="cell-text">infer_requested_section → get_retriever(section)</text>
+  <text x="640" y="278" class="cell-text">→ retriever.invoke → LLM</text>
+  <text x="1210" y="252" class="cell-text">直接檢索對應險種條款，輸出回答 + 條款引用</text>
+
+  <!-- Row 2 -->
+  <rect x="90" y="350" width="520" height="120" class="scenario" />
+  <rect x="620" y="350" width="560" height="120" class="tool" />
+  <rect x="1190" y="350" width="520" height="120" class="result" />
+  <text x="110" y="382" class="cell-title">2. 口語同義詞</text>
+  <text x="110" y="408" class="cell-text">例：信用卡盜刷有哪些不能賠？</text>
+  <text x="640" y="382" class="cell-text">normalize_question_terms + SECTION_ALIASES</text>
+  <text x="640" y="408" class="cell-text">→ formal section query</text>
+  <text x="1210" y="382" class="cell-text">先正規化再檢索，降低用詞落差造成的 miss</text>
+
+  <!-- Row 3 -->
+  <rect x="90" y="480" width="520" height="120" class="scenario" />
+  <rect x="620" y="480" width="560" height="120" class="tool" />
+  <rect x="1190" y="480" width="520" height="120" class="result" />
+  <text x="110" y="512" class="cell-title">3. 延誤類型不明</text>
+  <text x="110" y="538" class="cell-text">例：旅遊延誤賠償怎麼算？</text>
+  <text x="640" y="512" class="cell-text">is_ambiguous_delay_question</text>
+  <text x="640" y="538" class="cell-text">→ build_delay_clarification_message</text>
+  <text x="1210" y="512" class="cell-text">先問「班機延誤 or 行李延誤」，暫不進檢索</text>
+
+  <!-- Row 4 -->
+  <rect x="90" y="610" width="520" height="120" class="scenario" />
+  <rect x="620" y="610" width="560" height="120" class="tool" />
+  <rect x="1190" y="610" width="520" height="120" class="result" />
+  <text x="110" y="642" class="cell-title">4. 險種不明</text>
+  <text x="110" y="668" class="cell-text">例：哪些原因屬於不可理賠範圍？</text>
+  <text x="640" y="642" class="cell-text">is_ambiguous_section_question</text>
+  <text x="640" y="668" class="cell-text">→ build_section_clarification_message</text>
+  <text x="1210" y="642" class="cell-text">先請使用者指定保險項目，避免跨險種誤答</text>
+
+  <!-- Row 5 -->
+  <rect x="90" y="740" width="520" height="120" class="scenario" />
+  <rect x="620" y="740" width="560" height="120" class="tool" />
+  <rect x="1190" y="740" width="520" height="120" class="result" />
+  <text x="110" y="772" class="cell-title">5. 澄清後短回覆</text>
+  <text x="110" y="798" class="cell-text">例：使用者只回「信用卡盜用保險」</text>
+  <text x="640" y="772" class="cell-text">rewrite_followup_question</text>
+  <text x="640" y="798" class="cell-text">+ last_assistant_message_is_clarification</text>
+  <text x="1210" y="772" class="cell-text">重寫成完整問題（再檢索），提升一致性</text>
+
+  <!-- Row 6 -->
+  <rect x="90" y="870" width="520" height="120" class="scenario" />
+  <rect x="620" y="870" width="560" height="120" class="tool" />
+  <rect x="1190" y="870" width="520" height="120" class="result" />
+  <text x="110" y="902" class="cell-title">6. 索引/維度錯誤與無結果</text>
+  <text x="110" y="928" class="cell-text">例：index 不存在、embedding 維度不一致、docs 為空</text>
+  <text x="640" y="902" class="cell-text">FileNotFoundError / dimension catch</text>
+  <text x="640" y="928" class="cell-text">build_embedding_mismatch_message / fallback</text>
+  <text x="1210" y="902" class="cell-text">回傳可操作錯誤提示或保守回覆，不直接爆錯</text>
+
+  <text x="90" y="1060" class="small">備註：檢索預設參數為 top_k=5；若可推斷 section，retriever 會自動套用 filter。</text>
+</svg>
